@@ -17,6 +17,34 @@ class Scanner {
     private final String source;
     private final List<Token> tokens = new ArrayList<>();
 
+    // Map of keywords for checking later.
+    private static final Map<String, TokenType> keywords;
+
+    /*
+        This is where keywords are defined. If you want to customize them (i.e. capitalize something, like booleans
+        in Python (true => True), you can do it here. New additions go here as well (like maybe some more standard
+        library functions!)
+     */
+    static {
+        keywords = new HashMap<>();
+        keywords.put("and",     AND);
+        keywords.put("class",   CLASS);
+        keywords.put("else",    ELSE);
+        keywords.put("false",   FALSE);
+        keywords.put("for",     FOR);
+        keywords.put("fun",     FUN);
+        keywords.put("if",      IF);
+        keywords.put("nil",     NIL);
+        keywords.put("or",      OR);
+        keywords.put("print",   PRINT);
+        keywords.put("return",  RETURN);
+        keywords.put("super",   SUPER);
+        keywords.put("this",    THIS);
+        keywords.put("true",    TRUE);
+        keywords.put("var",     VAR);
+        keywords.put("while",   WHILE);
+    }
+
     // Ints to keep track of current position in source.
     private int start = 0; // Position of first character of lexeme being scanned.
     private int current = 0; // Position of current lexeme being examined.
@@ -75,11 +103,22 @@ class Scanner {
             default:
                 if(isDigit(c)){ // Any numerical digit is valid here
                     number();
+                } else if(isAlpha(c)) {
+                    identifier();
                 } else {
                     Lox.error(line, "Unexpected character.");
                 }
                 break;
         }
+    }
+
+    private void identifier(){
+        while(isAlphaNumeric(peek())) advance();
+        // Check if identifier is a reserved word.
+        String text = source.substring(start, current);
+        TokenType type = keywords.get(text);
+        if(type == null) type = IDENTIFIER;
+        addToken(type);
     }
 
     private void number() {
@@ -132,6 +171,16 @@ class Scanner {
     private char peekNext(){
         if(current + 1 >= source.length()) return '\0';
         return source.charAt(current + 1);
+    }
+
+    private boolean isAlpha(char c){
+        return (c >= 'a' && c <= 'z') ||
+                (c >= 'A' && c <= 'Z') ||
+                c == '_';
+    }
+
+    private boolean isAlphaNumeric(char c){
+        return isAlpha(c) || isDigit(c);
     }
 
     private boolean isDigit(char c){
