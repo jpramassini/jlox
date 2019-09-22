@@ -80,10 +80,10 @@ class Scanner {
             case '+': addToken(PLUS); break;
             case ';': addToken(SEMICOLON); break;
             case '*': addToken(STAR); break;
-            case '!': addToken(match('=') ? BANG_EQUAL : BANG);
-            case '=': addToken(match('=') ? EQUAL_EQUAL : EQUAL);
-            case '<': addToken(match('=') ? LESS_EQUAL : LESS);
-            case '>': addToken(match('=') ? GREATER_EQUAL : GREATER);
+            case '!': addToken(match('=') ? BANG_EQUAL : BANG); break;
+            case '=': addToken(match('=') ? EQUAL_EQUAL : EQUAL); break;
+            case '<': addToken(match('=') ? LESS_EQUAL : LESS); break;
+            case '>': addToken(match('=') ? GREATER_EQUAL : GREATER); break;
             case '/':
                 if (match('/')) {   // This indicates a comment, which we don't care about.
                     while(peek() != '\n' && !isAtEnd()) advance();
@@ -197,6 +197,7 @@ class Scanner {
     }
 
     private void addToken(TokenType type){
+        System.out.println("Adding type of:" + type);
         addToken(type, null);
     }
 
