@@ -10,6 +10,8 @@ import java.util.Map;
 
 import static com.craftinginterpreters.lox.TokenType.*;
 
+// TODO: Add support for block comments. This will require handling newlines. Consider how nesting might work.
+
 class Scanner {
     // Store raw source code as a String.
     private final String source;
@@ -50,7 +52,62 @@ class Scanner {
             case '+': addToken(PLUS); break;
             case ';': addToken(SEMICOLON); break;
             case '*': addToken(STAR); break;
+            case '!': addToken(match('=') ? BANG_EQUAL : BANG);
+            case '=': addToken(match('=') ? EQUAL_EQUAL : EQUAL);
+            case '<': addToken(match('=') ? LESS_EQUAL : LESS);
+            case '>': addToken(match('=') ? GREATER_EQUAL : GREATER);
+            case '/':
+                if (match('/')) {   // This indicates a comment, which we don't care about.
+                    while(peek() != '\n' && !isAtEnd()) advance();
+                } else {
+                    addToken(SLASH);    // Not succeeded by another slash, so this means we actually care about this.
+                }
+                break;
+            case ' ':
+            case '\r':
+            case '\t':
+                break;  // Ignoring whitespace
+            case '\n':
+                line++; // Keeping our line count accurate!
+                break;
+            case '"': string(); break; // A " signifies the beginning of a string.
+
+            default:
+                Lox.error(line, "Unexpected character.");
+                break;
         }
+    }
+
+    private void string() {
+        while(peek() != '"' && !isAtEnd()){
+            if(peek() == '\n') line++;  // This line means multi-line strings ARE supported by Lox.
+            advance();
+        }
+
+        if(isAtEnd()){  // Uh oh, somebody forgot a closing quote.
+            Lox.error(line, "Unterminated string.");
+        }
+
+        advance(); // To get closing ".
+
+        String value = source.substring(start + 1, current - 1); // store value with quotes stripped off.
+        addToken(STRING, value);
+    }
+
+    // For differentiating between single and double char operators.
+    private boolean match(char expected) {
+        if (isAtEnd()) return false;
+        // No match! return false and don't advance. The next char is part of a different token.
+        if (source.charAt(current) != expected) return false;
+
+        // Match. Advance past next char, as it's part of this token
+        current++;
+        return true;
+    }
+
+    private char peek(){    // This is a lookahead, not how we never call advance() here.
+        if(isAtEnd()) return '\0';
+        return source.charAt(current);
     }
 
     private boolean isAtEnd(){
