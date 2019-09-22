@@ -73,9 +73,28 @@ class Scanner {
             case '"': string(); break; // A " signifies the beginning of a string.
 
             default:
-                Lox.error(line, "Unexpected character.");
+                if(isDigit(c)){ // Any numerical digit is valid here
+                    number();
+                } else {
+                    Lox.error(line, "Unexpected character.");
+                }
                 break;
         }
+    }
+
+    private void number() {
+        while(isDigit(peek())) advance();  // Keep on trucking while the next thing is also a digit.
+
+        // Look for decimals...
+        if(peek() == '.' && isDigit(peekNext())){   // If another digit is not next, then stop.
+            // Consume '.'
+            advance();
+
+            while (isDigit(peek())) advance();
+        }
+
+        addToken(NUMBER, Double.parseDouble(source.substring(start,current)));
+        // This is fine since we only have a number type rather than Int, Double, etc.
     }
 
     private void string() {
@@ -108,6 +127,15 @@ class Scanner {
     private char peek(){    // This is a lookahead, not how we never call advance() here.
         if(isAtEnd()) return '\0';
         return source.charAt(current);
+    }
+
+    private char peekNext(){
+        if(current + 1 >= source.length()) return '\0';
+        return source.charAt(current + 1);
+    }
+
+    private boolean isDigit(char c){
+        return c >= '0' && c <= '9';
     }
 
     private boolean isAtEnd(){

@@ -23,7 +23,12 @@ public class Lox {
         }
     }
 
-    public static void runPrompt() throws IOException {
+    private static void runFile(String path) throws IOException {
+        byte[] bytes = Files.readAllBytes(Paths.get(path));
+        run(new String(bytes, Charset.defaultCharset()));
+    }
+
+    private static void runPrompt() throws IOException {
         InputStreamReader input = new InputStreamReader(System.in);
         BufferedReader reader = new BufferedReader(input);
 
