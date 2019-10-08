@@ -197,7 +197,6 @@ class Scanner {
     }
 
     private void addToken(TokenType type){
-        System.out.println("Adding type of:" + type);
         addToken(type, null);
     }
 
