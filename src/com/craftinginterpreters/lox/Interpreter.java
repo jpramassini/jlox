@@ -2,6 +2,15 @@ package com.craftinginterpreters.lox;
 
 class Interpreter implements Expr.Visitor<Object>{
 
+    void interpret(Expr expression){
+        try {
+            Object value = evaluate(expression);
+            System.out.println(stringify(value));
+        } catch (RuntimeError error){
+            Lox.runtimeError(error);
+        }
+    }
+
     private Object evaluate(Expr expr) {
         return expr.accept(this);
     }
@@ -14,6 +23,7 @@ class Interpreter implements Expr.Visitor<Object>{
         switch (expr.operator.type) {
             // ARITHMETIC OPERATORS
             case MINUS:
+                checkNumberOperands(expr.operator, left, right);
                 return (double)left - (double)right;
             case PLUS:                              // The + operator is special because it's overloaded to allow both
                                                     // arithmetic adding and string concatenation.
@@ -24,10 +34,14 @@ class Interpreter implements Expr.Visitor<Object>{
                 if(left instanceof String && right instanceof String){
                     return (String)left + (String)right;
                 }
+                // Addition is once again a special case and requires its own specific error handling.
+                throw new RuntimeError(expr.operator, "Operands must be either two numbers or two strings.");
 
             case SLASH:
+                checkNumberOperands(expr.operator, left, right);
                 return (double)left / (double)right;
             case STAR:
+                checkNumberOperands(expr.operator, left, right);
                 return (double)left * (double)right;
             // EQUALITY OPERATORS
             case GREATER:
@@ -61,6 +75,7 @@ class Interpreter implements Expr.Visitor<Object>{
 
         switch (expr.operator.type) {
             case MINUS:                 // Flip the sign of the operand
+                checkNumberOperand(expr.operator, right);
                 return -(double)right; // Note: The cast here is important. The operand is cast at runtime, which allows for dynamic typing in Lox.
             case BANG:
                 return !isTruthy(right);
@@ -68,6 +83,16 @@ class Interpreter implements Expr.Visitor<Object>{
 
         // This should never be reached, but just in case...
         return null;
+    }
+
+    private void checkNumberOperand(Token operator, Object operand){
+        if(operand instanceof Double) return;
+        throw new RuntimeError(operator, "Operand must be a number.");
+    }
+
+    private void checkNumberOperands(Token operator, Object left, Object right){
+        if(left instanceof Double && right instanceof Double) return;
+        throw new RuntimeError(operator, "Operands must be numbers.");
     }
 
     private boolean isEqual(Object a, Object b){
@@ -86,5 +111,21 @@ class Interpreter implements Expr.Visitor<Object>{
         if(object==null) return false;
         if(object instanceof Boolean) return (boolean)object;   // Could be condensed, keeping this for readability/modifiable-ness
         return true;
+    }
+
+    private String stringify(Object object){
+        if(object == null) return "nil";
+
+        // This is a fun hack to remove the ".0" that comes with treating everything as a double.
+        if(object instanceof Double){
+            String text = object.toString();
+            if(text.endsWith(".0")){
+                text = text.substring(0, text.length() - 2);
+            }
+            return text;
+        }
+        // It's not a number, so just return the toString (this handles booleans and normal strings)
+        // This also keeps the externally visible value _similar_ to Java's version.
+        return object.toString();
     }
 }
