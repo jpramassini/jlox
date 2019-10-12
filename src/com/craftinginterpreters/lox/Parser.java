@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.craftinginterpreters.lox.TokenType.*;
@@ -15,13 +16,13 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    // This function "kicks off" the parsing festivities, starting by calling the most general/lowest precedence rule.
-    Expr parse(){
-        try {
-            return expression();
-        } catch (ParseError error){
-            return null;    // TODO: Some error handling. Probably a good idea idk
+    List<Stmt> parse(){
+        List<Stmt> statements = new ArrayList<>();
+        while(!isAtEnd()) {
+            statements.add(statement());
         }
+
+        return statements;
     }
 
     //  Through this section, the recursive nature of the parser will be much more clear
@@ -30,6 +31,29 @@ public class Parser {
     //  precedence!)
     private Expr expression() {
         return equality();
+    }
+
+    private Stmt statement() {
+        if(match(PRINT)) return printStatement();
+
+        return expressionStatement();   // This is the "fallthrough" option, as it's pretty hard to tell something is an
+    }                                   // expression statement based on a leading token.
+
+    private Stmt printStatement() {
+        Expr value = expression();
+        consumeSemi();
+        return new Stmt.Print(value);
+    }
+
+    private Stmt expressionStatement(){
+        Expr expr = expression();
+        consumeSemi();
+        return new Stmt.Expression(expr);
+    }
+
+    // Helper method to consume semicolons for statements.
+    private Token consumeSemi(){
+        return consume(SEMICOLON, "Expect ';' after value.");
     }
 
     // ******************** START OF BINARY EXPRESSIONS **********************

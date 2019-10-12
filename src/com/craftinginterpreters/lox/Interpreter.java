@@ -1,11 +1,15 @@
 package com.craftinginterpreters.lox;
 
-class Interpreter implements Expr.Visitor<Object>{
+import java.util.List;
 
-    void interpret(Expr expression){
+// Note: Statements produce no values, hence the Void type on the Visitor interface.
+class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
+
+    void interpret(List<Stmt> statements){
         try {
-            Object value = evaluate(expression);
-            System.out.println(stringify(value));
+            for (Stmt statement : statements) {
+                execute(statement);
+            }
         } catch (RuntimeError error){
             Lox.runtimeError(error);
         }
@@ -14,6 +18,24 @@ class Interpreter implements Expr.Visitor<Object>{
     private Object evaluate(Expr expr) {
         return expr.accept(this);
     }
+
+    private void execute(Stmt stmt){    // Note: this is the statement equivalent to evaluate()
+        stmt.accept(this);
+    }
+
+    @Override
+    public Void visitExpressionStmt(Stmt.Expression stmt){
+        evaluate(stmt.expression);
+        return null;    // Note: This return is necessary to satisfy the Java Void type requirements.
+    }
+
+    @Override
+    public Void visitPrintStmt(Stmt.Print stmt) {   // Note: this discards the expression's value as we only care about printing it.
+        Object value = evaluate(stmt.expression);
+        System.out.println(stringify(value));
+        return null;
+    }
+
 
     @Override
     public Object visitBinaryExpr(Expr.Binary expr) {

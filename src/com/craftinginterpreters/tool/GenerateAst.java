@@ -21,6 +21,15 @@ public class GenerateAst {
                 "Literal  : Object value",
                 "Unary    : Token operator, Expr right"
         ));
+
+        /* Note: This addition of another base class makes this script super useful. Adding a new base class file is
+                 as simple as adding another call to defineAst!
+       */
+        // To generate classes of statements
+        defineAst(outputDir, "Stmt", Arrays.asList(
+                "Expression : Expr expression",
+                "Print      : Expr expression"
+        ));
     }
 
     private static void defineAst(
