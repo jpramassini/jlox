@@ -30,8 +30,10 @@ public class Parser {
     //  In our grammar, the "expression" rule simply expands to the equality rule (it can't be anything else due to
     //  precedence!)
     private Expr expression() {
-        return equality();
+        return assignment();
     }
+
+
 
     private Stmt declaration() {
         try{
@@ -82,6 +84,25 @@ public class Parser {
     // Overloaded version to allow for more specific semicolon error msgs.
     private Token consumeSemi(String message){
         return consume(SEMICOLON, message);
+    }
+
+    private Expr assignment(){
+        Expr expr = equality(); // Note: First parse the left hand side in case there's other stuff that needs to be evaluated first.
+                                // We can get away with this because all valid assignment targets are valid expressions on their own.
+                                // This line also allows this to be done without a ton of looking ahead.
+        if(match(EQUAL)) {
+            Token equals = previous();
+            Expr value = assignment();  // Note: assignment is RIGHT associative, which is why assignment is recursively called.
+                                        //       This means that looping is unnecessary.
+            if(expr instanceof Expr.Variable) {          // Note: We first check if the L value is a variable identifier before creating a
+                Token name = ((Expr.Variable) expr).name;//       Variable node,
+                return new Expr.Assign(name, value);
+            }
+
+            error(equals, "Invalid assignment target.");    // Note: this gets reported but not thrown to avoid triggering panic mode.
+        }
+
+        return expr;
     }
 
     // ******************** START OF BINARY EXPRESSIONS **********************
