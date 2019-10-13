@@ -19,7 +19,7 @@ public class Parser {
     List<Stmt> parse(){
         List<Stmt> statements = new ArrayList<>();
         while(!isAtEnd()) {
-            statements.add(statement());
+            statements.add(declaration());
         }
 
         return statements;
@@ -31,6 +31,16 @@ public class Parser {
     //  precedence!)
     private Expr expression() {
         return equality();
+    }
+
+    private Stmt declaration() {
+        try{
+            if (match(VAR)) return varDeclaration();
+            return statement();
+        } catch (ParseError error){
+            synchronize();
+            return null;
+        }
     }
 
     private Stmt statement() {
@@ -45,6 +55,19 @@ public class Parser {
         return new Stmt.Print(value);
     }
 
+    private Stmt varDeclaration(){
+        // Var has already been matched, so go ahead and grab the var name.
+        Token name = consume(IDENTIFIER, "Expect variable name.");
+        Expr initializer = null;
+        // Parse the initializer if an '=' is present. This branching allows initialization without declaration.
+        if(match(EQUAL)){
+            initializer = expression();
+        }
+
+        consumeSemi("Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
+    }
+
     private Stmt expressionStatement(){
         Expr expr = expression();
         consumeSemi();
@@ -54,6 +77,11 @@ public class Parser {
     // Helper method to consume semicolons for statements.
     private Token consumeSemi(){
         return consume(SEMICOLON, "Expect ';' after value.");
+    }
+
+    // Overloaded version to allow for more specific semicolon error msgs.
+    private Token consumeSemi(String message){
+        return consume(SEMICOLON, message);
     }
 
     // ******************** START OF BINARY EXPRESSIONS **********************
@@ -142,6 +170,10 @@ public class Parser {
         if(match(NUMBER, STRING)){
             // These values have already been parsed into Java values by the scanner
             return new Expr.Literal(previous().literal);
+        }
+
+        if(match(IDENTIFIER)){
+            return new Expr.Variable(previous());   // This is what allows the use of variables
         }
 
         if(match(LEFT_PAREN)) {

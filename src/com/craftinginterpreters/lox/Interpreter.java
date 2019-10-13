@@ -5,6 +5,10 @@ import java.util.List;
 // Note: Statements produce no values, hence the Void type on the Visitor interface.
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
+    // Note: putting this instantiation at the Interpreter class level keeps global variables around as long as the
+    //      interpreter is running.
+    private Environment environment = new Environment();
+
     void interpret(List<Stmt> statements){
         try {
             for (Stmt statement : statements) {
@@ -36,6 +40,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         return null;
     }
 
+    @Override
+    public Void visitVarStmt(Stmt.Var stmt){
+        Object value = null;
+        if(stmt.initializer != null){
+            value = evaluate(stmt.initializer);
+        }
+
+        environment.define(stmt.name.lexeme, value);    // There is an initializer, so pop it into the map.
+        return null;
+    }
 
     @Override
     public Object visitBinaryExpr(Expr.Binary expr) {
@@ -105,6 +119,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
         // This should never be reached, but just in case...
         return null;
+    }
+
+    public Object visitVariableExpr(Expr.Variable expr){
+        return environment.get(expr.name);
     }
 
     private void checkNumberOperand(Token operator, Object operand){
