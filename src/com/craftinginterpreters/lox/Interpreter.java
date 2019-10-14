@@ -59,6 +59,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitIfStmt(Stmt.If stmt) {         // Note: the Lox implementation ends up being a small wrapper around the same Java code.
+        if(isTruthy(evaluate(stmt.condition))){
+            execute(stmt.thenBranch);
+        } else if(stmt.elseBranch != null){
+            execute(stmt.elseBranch);
+        }
+        return null;
+    }
+
+    @Override
     public Void visitPrintStmt(Stmt.Print stmt) {   // Note: this discards the expression's value as we only care about printing it.
         Object value = evaluate(stmt.expression);
         System.out.println(stringify(value));
@@ -73,6 +83,14 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         }
 
         environment.define(stmt.name.lexeme, value);    // There is an initializer, so pop it into the map.
+        return null;
+    }
+
+    @Override
+    public Void visitWhileStmt(Stmt.While stmt){
+        while(isTruthy(evaluate(stmt.condition))){
+            execute(stmt.body);
+        }
         return null;
     }
 
@@ -100,11 +118,11 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
                     return (double)left + (double) right;
                 }
 
-                if(left instanceof String && right instanceof String){
-                    return (String)left + (String)right;
+                if((left instanceof String) && (right instanceof String || right instanceof Double || right instanceof Boolean)){
+                    return (String)left + stringify(right);
                 }
                 // Addition is once again a special case and requires its own specific error handling.
-                throw new RuntimeError(expr.operator, "Operands must be either two numbers or two strings.");
+                throw new RuntimeError(expr.operator, "Operands must be either two numbers or a string and a literal value.");
 
             case SLASH:
                 checkNumberOperands(expr.operator, left, right);
@@ -132,6 +150,19 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     @Override
     public Object visitLiteralExpr(Expr.Literal expr) {
         return expr.value;
+    }
+
+    @Override
+    public Object visitLogicalExpr(Expr.Logical expr){
+        Object left = evaluate(expr.left);
+         // Here's where the earlier work establishing truthiness becomes helpful!
+        if(expr.operator.type == TokenType.OR){
+            if(isTruthy(left)) return left;   // Note: evaluate left first to see if short-circuit is possible.
+        } else {
+            if(!isTruthy(left)) return left;
+        }
+
+        return evaluate(expr.right);        // At this point we have to evaluate the right.
     }
 
     @Override

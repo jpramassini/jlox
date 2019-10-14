@@ -1,6 +1,7 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.craftinginterpreters.lox.TokenType.*;
@@ -33,8 +34,6 @@ public class Parser {
         return assignment();
     }
 
-
-
     private Stmt declaration() {
         try{
             if (match(VAR)) return varDeclaration();
@@ -46,11 +45,72 @@ public class Parser {
     }
 
     private Stmt statement() {
+        if(match(FOR)) return forStatement();
+        if(match(IF)) return ifStatement();
         if(match(PRINT)) return printStatement();
+        if(match(WHILE)) return whileStatement();
         if(match(LEFT_BRACE)) return new Stmt.Block(block());
 
         return expressionStatement();   // This is the "fallthrough" option, as it's pretty hard to tell something is an
     }                                   // expression statement based on a leading token.
+
+    /*
+        This is a pretty hefty block of code, but it's worth it. This desugars a for-loop into a node type we already support,
+        while loops. This means the interpreter doesn't need to get modified at all! We progressively grab each element out of the loop syntax
+        and then artificially create a while loop node, appending the increment to the body block of code run each loop.
+     */
+    private Stmt forStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+        Stmt initializer;
+        if(match(SEMICOLON)){
+            initializer = null;
+        } else if(match(VAR)){
+            initializer = varDeclaration();
+        } else {
+            initializer = expressionStatement();        // One of the few places where an expression OR a statement is allowed.
+        }
+
+        Expr condition = null;
+        if(!check(SEMICOLON)){
+            condition = expression();
+        }
+        consumeSemi("Expect ';' after loop condition.");
+
+        Expr increment = null;
+        if(!check(RIGHT_PAREN)){
+            increment = expression();
+        }
+        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        Stmt body = statement();
+
+        if(increment != null){
+            body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment))); // Execute the body and increment as their own block of code.
+        }
+
+        if(condition == null) condition = new Expr.Literal(true);   // No condition given, this is an infinite loop.
+        body = new Stmt.While(condition, body);
+
+        if(initializer != null){
+            body = new Stmt.Block(Arrays.asList(initializer, body)); // Execute the instantiation, then the loop block.
+        }
+
+        return body;
+    }
+
+    private Stmt ifStatement(){
+        consume(LEFT_PAREN, "Expect '(' after 'if'.");  // Note: this paren is really not that useful. It's the closing paren that's necessary as a delimiter.
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after if condition.");
+        // Note: the fact that ')' is what separates the condition allows for single line if statements without {}.
+        Stmt thenBranch = statement();
+        Stmt elseBranch = null;
+        if(match(ELSE)) {               // Eagerly check for an else before creating the Stmt
+            elseBranch = statement();
+        }
+        return new Stmt.If(condition, thenBranch, elseBranch);
+    }
 
     private Stmt printStatement() {
         Expr value = expression();
@@ -69,6 +129,15 @@ public class Parser {
 
         consumeSemi("Expect ';' after variable declaration.");
         return new Stmt.Var(name, initializer);
+    }
+
+    private Stmt whileStatement(){
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after condition");
+        Stmt body = statement();
+
+        return new Stmt.While(condition, body);
     }
 
     private Stmt expressionStatement(){
@@ -99,7 +168,7 @@ public class Parser {
     }
 
     private Expr assignment(){
-        Expr expr = equality(); // Note: First parse the left hand side in case there's other stuff that needs to be evaluated first.
+        Expr expr = or(); // Note: First parse the left hand side in case there's other stuff that needs to be evaluated first.
                                 // We can get away with this because all valid assignment targets are valid expressions on their own.
                                 // This line also allows this to be done without a ton of looking ahead.
         if(match(EQUAL)) {
@@ -119,6 +188,27 @@ public class Parser {
 
     // ******************** START OF BINARY EXPRESSIONS **********************
     // TODO: Write some unified code that could make some of this less redundant! These are left associative and could be made more uniform.
+
+    private Expr or(){      // This uses the same recursive matching structure as other binary operators.
+        Expr expr = and();  // OR takes precedence over AND.
+        while(match(OR)){
+            Token operator = previous();
+            Expr right = and();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+        return expr;
+    }
+
+    private Expr and(){
+        Expr expr = equality();
+
+        while(match(AND)){
+            Token operator = previous();
+            Expr right = equality();        // With this call, the call hierarchy is reconnected.
+            expr = new Expr.Logical(expr, operator, right);
+        }
+        return expr;
+    }
 
     private Expr equality() {
         Expr expr = comparison();   // This is the left token of the equality expr.
