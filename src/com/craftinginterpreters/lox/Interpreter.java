@@ -8,6 +8,11 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     // Note: putting this instantiation at the Interpreter class level keeps global variables around as long as the
     //      interpreter is running.
     private Environment environment = new Environment();
+    private boolean replMode = false;
+
+    public void setReplMode(boolean replMode){
+        this.replMode = replMode;
+    }
 
     void interpret(List<Stmt> statements){
         try {
@@ -27,9 +32,29 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         stmt.accept(this);
     }
 
+    private void executeBlock(List<Stmt> statements, Environment environment){
+        Environment previous = this.environment;    // Store higher environment to reset later
+        try {
+            this.environment = environment;         // Switch execution scope to new local scope. Because of the recursive nature of
+                                                    // the Environment class, it's still accessible if necessary.
+            for(Stmt statement : statements){
+                execute(statement);
+            }
+        } finally {
+            this.environment = previous;            // This is maybe a bit inelegant. The other alternative is explicitly passing an
+        }                                           // environment to each visit method, which seems equally as inelegant and more tedious.
+    }
+
+    @Override
+    public Void visitBlockStmt(Stmt.Block stmt){
+        executeBlock(stmt.statements, new Environment(environment));    // Execute block, instantiating a new environment which is enclosed
+        return null;                                                    // by the global scope on the way in.
+    }
+
     @Override
     public Void visitExpressionStmt(Stmt.Expression stmt){
-        evaluate(stmt.expression);
+        Object result = evaluate(stmt.expression);
+        if(this.replMode && !(stmt.expression instanceof Expr.Assign)) System.out.println(stringify(result));    // Immediately print result of expressions if running in repl.
         return null;    // Note: This return is necessary to satisfy the Java Void type requirements.
     }
 

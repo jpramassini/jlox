@@ -52,6 +52,7 @@ public class Lox {
 
         if(hadError) return;
 
+        interpreter.setReplMode(true);
         interpreter.interpret(statements);
     }
 

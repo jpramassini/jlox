@@ -47,6 +47,7 @@ public class Parser {
 
     private Stmt statement() {
         if(match(PRINT)) return printStatement();
+        if(match(LEFT_BRACE)) return new Stmt.Block(block());
 
         return expressionStatement();   // This is the "fallthrough" option, as it's pretty hard to tell something is an
     }                                   // expression statement based on a leading token.
@@ -74,6 +75,17 @@ public class Parser {
         Expr expr = expression();
         consumeSemi();
         return new Stmt.Expression(expr);
+    }
+
+    private List<Stmt> block() {
+        List<Stmt> statements = new ArrayList<>();
+
+        while(!check(RIGHT_BRACE) && !isAtEnd()) {      // Note: This explicit EOF check is necessary to avoid infinite loops when parsing.
+            statements.add(declaration());              // If the user forgot a closing '}', we need to be defensive.
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after block.");
+        return statements;
     }
 
     // Helper method to consume semicolons for statements.
