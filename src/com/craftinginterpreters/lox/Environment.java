@@ -39,8 +39,15 @@ public class Environment {
         throw new RuntimeError(name, "Undefined variable '" + name.lexeme +"'.");
     }
 
-    void define(String name, Object value){     // Note: The choice to not check for existing name -> value mappings here
-        values.put(name, value);                // allows for the use of var a = "something" to be used to reassign an existing value.
-    }                                           // This choice was made to make using the REPL more ergonomic.
+    // The string version of this call is used for adding new native functions.
+    void defineInternal(String name, Object value){
+        values.put(name, value);
+    }
+
+    // No longer allow redefinition to prevent argument reassignment.
+    void define(Token name, Object value) {
+        if(values.containsKey(name.lexeme)) throw new RuntimeError(name, "Variable '" + name.lexeme + "' already defined in this scope.");
+        values.put(name.lexeme, value);
+    }
 
 }

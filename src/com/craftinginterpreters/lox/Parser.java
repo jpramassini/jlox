@@ -13,11 +13,11 @@ public class Parser {
     private final List<Token> tokens;
     private int current = 0;
 
-    Parser(List<Token> tokens){
+    Parser(List<Token> tokens) {
         this.tokens = tokens;
     }
 
-    List<Stmt> parse(){
+    List<Stmt> parse() {
         List<Stmt> statements = new ArrayList<>();
         while(!isAtEnd()) {
             statements.add(declaration());
@@ -36,9 +36,10 @@ public class Parser {
 
     private Stmt declaration() {
         try{
+            if(match(FUN)) return function("function"); // Functions are recognized by their leading keyword.
             if (match(VAR)) return varDeclaration();
             return statement();
-        } catch (ParseError error){
+        } catch (ParseError error) {
             synchronize();
             return null;
         }
@@ -48,6 +49,7 @@ public class Parser {
         if(match(FOR)) return forStatement();
         if(match(IF)) return ifStatement();
         if(match(PRINT)) return printStatement();
+        if(match(RETURN)) return returnStatement();
         if(match(WHILE)) return whileStatement();
         if(match(LEFT_BRACE)) return new Stmt.Block(block());
 
@@ -63,43 +65,43 @@ public class Parser {
         consume(LEFT_PAREN, "Expect '(' after 'for'.");
 
         Stmt initializer;
-        if(match(SEMICOLON)){
+        if(match(SEMICOLON)) {
             initializer = null;
-        } else if(match(VAR)){
+        } else if(match(VAR)) {
             initializer = varDeclaration();
         } else {
             initializer = expressionStatement();        // One of the few places where an expression OR a statement is allowed.
         }
 
         Expr condition = null;
-        if(!check(SEMICOLON)){
+        if(!check(SEMICOLON)) {
             condition = expression();
         }
         consumeSemi("Expect ';' after loop condition.");
 
         Expr increment = null;
-        if(!check(RIGHT_PAREN)){
+        if(!check(RIGHT_PAREN)) {
             increment = expression();
         }
         consume(RIGHT_PAREN, "Expect ')' after for clauses.");
 
         Stmt body = statement();
 
-        if(increment != null){
+        if(increment != null) {
             body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment))); // Execute the body and increment as their own block of code.
         }
 
         if(condition == null) condition = new Expr.Literal(true);   // No condition given, this is an infinite loop.
         body = new Stmt.While(condition, body);
 
-        if(initializer != null){
+        if(initializer != null) {
             body = new Stmt.Block(Arrays.asList(initializer, body)); // Execute the instantiation, then the loop block.
         }
 
         return body;
     }
 
-    private Stmt ifStatement(){
+    private Stmt ifStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'if'.");  // Note: this paren is really not that useful. It's the closing paren that's necessary as a delimiter.
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expect ')' after if condition.");
@@ -118,12 +120,23 @@ public class Parser {
         return new Stmt.Print(value);
     }
 
-    private Stmt varDeclaration(){
+    private Stmt returnStatement() {
+        Token keyword = previous(); // grab the return keyword
+        Expr value = null;
+        if(!check(SEMICOLON)){      // If there's anything after return, we're returning an expression of some sort.
+            value = expression();   // This proves its presence by disproving its absence.
+        }
+
+        consumeSemi("Expect ';' after return value.");
+        return new Stmt.Return(keyword, value);
+    }
+
+    private Stmt varDeclaration() {
         // Var has already been matched, so go ahead and grab the var name.
         Token name = consume(IDENTIFIER, "Expect variable name.");
         Expr initializer = null;
         // Parse the initializer if an '=' is present. This branching allows initialization without declaration.
-        if(match(EQUAL)){
+        if(match(EQUAL)) {
             initializer = expression();
         }
 
@@ -131,7 +144,7 @@ public class Parser {
         return new Stmt.Var(name, initializer);
     }
 
-    private Stmt whileStatement(){
+    private Stmt whileStatement() {
         consume(LEFT_PAREN, "Expect '(' after 'while'.");
         Expr condition = expression();
         consume(RIGHT_PAREN, "Expect ')' after condition");
@@ -140,10 +153,30 @@ public class Parser {
         return new Stmt.While(condition, body);
     }
 
-    private Stmt expressionStatement(){
+    private Stmt expressionStatement() {
         Expr expr = expression();
         consumeSemi();
         return new Stmt.Expression(expr);
+    }
+
+    private Stmt.Function function(String kind) {
+        Token name;
+        name = consume(IDENTIFIER, "Expect " + kind + " name.");  // Grab that function name
+        consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList<>();
+        if(!check(RIGHT_PAREN)) {
+            do {
+                if(parameters.size() >= 255){
+                    error(peek(), "Cannot have more than 255 parameters."); // Not thrown on purpose
+                }
+
+                parameters.add(consume(IDENTIFIER, "Expect paremeter name."));
+            } while(match(COMMA));
+        }
+        consume(RIGHT_PAREN, "Expect ')' after parameters.");
+        consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+        List<Stmt> body = block();
+        return new Stmt.Function(name, parameters, body);
     }
 
     private List<Stmt> block() {
@@ -158,16 +191,16 @@ public class Parser {
     }
 
     // Helper method to consume semicolons for statements.
-    private Token consumeSemi(){
+    private Token consumeSemi() {
         return consume(SEMICOLON, "Expect ';' after value.");
     }
 
     // Overloaded version to allow for more specific semicolon error msgs.
-    private Token consumeSemi(String message){
+    private Token consumeSemi(String message) {
         return consume(SEMICOLON, message);
     }
 
-    private Expr assignment(){
+    private Expr assignment() {
         Expr expr = or(); // Note: First parse the left hand side in case there's other stuff that needs to be evaluated first.
                                 // We can get away with this because all valid assignment targets are valid expressions on their own.
                                 // This line also allows this to be done without a ton of looking ahead.
@@ -189,9 +222,9 @@ public class Parser {
     // ******************** START OF BINARY EXPRESSIONS **********************
     // TODO: Write some unified code that could make some of this less redundant! These are left associative and could be made more uniform.
 
-    private Expr or(){      // This uses the same recursive matching structure as other binary operators.
+    private Expr or() {      // This uses the same recursive matching structure as other binary operators.
         Expr expr = and();  // OR takes precedence over AND.
-        while(match(OR)){
+        while(match(OR)) {
             Token operator = previous();
             Expr right = and();
             expr = new Expr.Logical(expr, operator, right);
@@ -199,10 +232,10 @@ public class Parser {
         return expr;
     }
 
-    private Expr and(){
+    private Expr and() {
         Expr expr = equality();
 
-        while(match(AND)){
+        while(match(AND)) {
             Token operator = previous();
             Expr right = equality();        // With this call, the call hierarchy is reconnected.
             expr = new Expr.Logical(expr, operator, right);
@@ -222,7 +255,7 @@ public class Parser {
               Because each of these functions calls the next one first, we will always only tack on expressions
               if they match. (This is a really clever design.)
          */
-        while(match(BANG_EQUAL, EQUAL_EQUAL)){  // Run until we hit something that isn't an equality operator
+        while(match(BANG_EQUAL, EQUAL_EQUAL)) {  // Run until we hit something that isn't an equality operator
             // We saw a != or ==, which means that the prev token is the operator [because of advance()]!
             Token operator = previous();
             Expr right = comparison();
@@ -235,7 +268,7 @@ public class Parser {
     }
 
     // Note: This function is almost *exactly* the same as the previous.
-    private Expr comparison(){
+    private Expr comparison() {
         Expr expr = addition();
 
         while(match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL)) {    // These variable length arguments are real convenient
@@ -250,7 +283,7 @@ public class Parser {
     private Expr addition() {
         Expr expr = multiplication();   // Same deal, calling the function of next highest precedence
 
-        while(match(PLUS, MINUS)){
+        while(match(PLUS, MINUS)) {
             Token operator = previous();
             Expr right = multiplication();
             expr = new Expr.Binary(expr, operator, right);
@@ -259,7 +292,7 @@ public class Parser {
         return expr;
     }
 
-    private Expr multiplication(){
+    private Expr multiplication() {
         Expr expr = unary();
 
         while(match(SLASH, STAR)) {
@@ -273,29 +306,59 @@ public class Parser {
 
     // ******************** END OF BINARY EXPRESSIONS **********************
 
-    private Expr unary(){
-        if(match(BANG, MINUS)){     // If this thing can be accurately considered a unary...
+    private Expr unary() {
+        if(match(BANG, MINUS)) {     // If this thing can be accurately considered a unary...
             Token operator = previous();
             Expr right = unary();
             return new Expr.Unary(operator, right);
         }
 
-        return primary();           // Otherwise, pass it up the chain of precedence
+        return call();           // Otherwise, pass it up the chain of precedence
+    }
+
+    private Expr finishCall(Expr callee) {
+        List<Expr> arguments = new ArrayList<>();
+        if(!check(RIGHT_PAREN)) {    // This check is necessary for no argument function calls. If there's no arguments, just keep trucking without them.
+            do{
+                if(arguments.size() >= 255) {
+                    error(peek(), "Cannot have more than 255 arguments.");  // Just in case anybody tries to get real wild with arguments. Not thrown on purpose.
+                }
+                arguments.add(expression());
+            } while(match(COMMA));  // Keep going until out of arguments.
+        }
+
+        Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");  // This will also catch the case of a trailing comma, where we would
+                                                                                     // accidentally consume the terminating ')' token.
+        return new Expr.Call(callee, paren, arguments); // By returning an expression, we can chain calls in the below function call().
+    }
+
+    private Expr call() {
+        Expr expr = primary();
+
+        while(true) {
+            if(match(LEFT_PAREN)) {     // A function call is denoted by a '(', so look for those.
+                expr = finishCall(expr);    // Parse call, using previous expr as the callee. This will also recursively build up chained call results.
+            } else {
+                break;
+            }
+        }
+
+        return expr;
     }
 
     // Single terminals. This means we're going to begin to actually start returning values.
-    // This could also be cleaned up to not be so if-statement heavy.
-    private Expr primary(){
+    // This could also be cleaned up to not be so if-statement heavy. Basically literals.
+    private Expr primary() {
         if(match(FALSE)) return new Expr.Literal(false);
         if(match(TRUE)) return new Expr.Literal(true);
         if(match(NIL)) return new Expr.Literal(null);
 
-        if(match(NUMBER, STRING)){
+        if(match(NUMBER, STRING)) {
             // These values have already been parsed into Java values by the scanner
             return new Expr.Literal(previous().literal);
         }
 
-        if(match(IDENTIFIER)){
+        if(match(IDENTIFIER)) {
             return new Expr.Variable(previous());   // This is what allows the use of variables
         }
 
@@ -309,7 +372,7 @@ public class Parser {
     }
 
     // Helper method to check if a given token matches any of a set of types.
-    private boolean match(TokenType... types){
+    private boolean match(TokenType... types) {
         for (TokenType type : types) {
             if(check(type)) {   // Hit! consume token and step forward
                 advance();
@@ -320,25 +383,25 @@ public class Parser {
     }
 
     // Function similar to match, but used when it's imperative that the next character is of a specific type.
-    private Token consume(TokenType type, String message){
+    private Token consume(TokenType type, String message) {
         if(check(type)) return advance();   // If the next token is the right type, we've got no problems
 
         throw error(peek(), message);   // It didn't match, so sound the alarm.
     }
 
     // Part of match's operation: the actual equality check
-    private boolean check(TokenType type){
+    private boolean check(TokenType type) {
         return !isAtEnd() && peek().type == type;
     }
 
     // Returns what is essentially the current token and step ahead by one in Token list
-    private Token advance(){
+    private Token advance() {
         if(!isAtEnd()) current++;
         return previous();
     }
 
     // Check if there are any more tokens to parse (here's where explicitly storing EOF as a token makes life easy)
-    private boolean isAtEnd(){
+    private boolean isAtEnd() {
         return peek().type == EOF;
     }
 
@@ -357,15 +420,15 @@ public class Parser {
         return new ParseError();    // We return instead of throw in case it's a non-fatal error. Something else can decide to throw.
     }
 
-    private void synchronize(){     // TODO: Actually use this method. There aren't statements yet so this doesn't mean much.
+    private void synchronize() {     // TODO: Actually use this method. There aren't statements yet so this doesn't mean much.
         advance();
 
-        while(!isAtEnd()){
+        while(!isAtEnd()) {
             if(previous().type == SEMICOLON) return;    // time to relax, we found the end of the statement.
             // This semicolon business is also somewhat vulnerable to for loop syntax. This could maybe be reworked to be
             // more defensive in that case.
 
-            switch(peek().type){    // All of these likely signify the start of a statement, so they're safe to return on
+            switch(peek().type) {    // All of these likely signify the start of a statement, so they're safe to return on
                 case CLASS:
                 case FUN:
                 case VAR:

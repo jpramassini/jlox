@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 // Note: Statements produce no values, hence the Void type on the Visitor interface.
@@ -7,8 +8,28 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     // Note: putting this instantiation at the Interpreter class level keeps global variables around as long as the
     //      interpreter is running.
-    private Environment environment = new Environment();
-    private boolean replMode = false;
+    final Environment globals = new Environment();  // This allows us to keep a global environment reference regardless of how
+    private Environment environment = globals;      // deeply nested our environments get. That means this "environment"
+    private boolean replMode = false;               // field is responsible for the CURRENT environment
+
+    Interpreter() {
+        // this is an example of exposing a native function. This could be extended to support anything Java does!
+        // TODO: Build a module import system out of this.
+        globals.defineInternal("clock", new LoxCallable(){  // Note: This means that functions and variables are held together! This allows collisions,
+            @Override                                             // but allows referring to functions as first-class values.
+            public int arity() {
+                return 0;
+            }
+
+            @Override
+            public Object call(Interpreter interpreter, List<Object> arguments) {
+                return (double)System.currentTimeMillis() / 1000.0;
+            }
+
+            @Override
+            public String toString() {return "<native fn>";}
+        });
+    }
 
     public void setReplMode(boolean replMode){
         this.replMode = replMode;
@@ -32,7 +53,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         stmt.accept(this);
     }
 
-    private void executeBlock(List<Stmt> statements, Environment environment){
+    public void executeBlock(List<Stmt> statements, Environment environment){
         Environment previous = this.environment;    // Store higher environment to reset later
         try {
             this.environment = environment;         // Switch execution scope to new local scope. Because of the recursive nature of
@@ -59,6 +80,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitFunctionStmt(Stmt.Function stmt) {
+        LoxFunction function = new LoxFunction(stmt, environment);
+        environment.define(stmt.name, function); // Note: Make sure upper environment knows about function so it can actually be referenced.
+        return null;                                    // This also conveniently discards any functions that are declared within a local scope.
+    }
+
+    @Override
     public Void visitIfStmt(Stmt.If stmt) {         // Note: the Lox implementation ends up being a small wrapper around the same Java code.
         if(isTruthy(evaluate(stmt.condition))){
             execute(stmt.thenBranch);
@@ -76,13 +104,21 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitReturnStmt(Stmt.Return stmt){
+        Object value = null;
+        if(stmt.value != null) value = evaluate(stmt.value);
+
+        throw new Return(value);
+    }
+
+    @Override
     public Void visitVarStmt(Stmt.Var stmt){
         Object value = null;
         if(stmt.initializer != null){
             value = evaluate(stmt.initializer);
         }
 
-        environment.define(stmt.name.lexeme, value);    // There is an initializer, so pop it into the map.
+        environment.define(stmt.name, value);    // There is an initializer, so pop it into the map.
         return null;
     }
 
@@ -145,6 +181,30 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
                 return isEqual(left, right);
         }
         return null;    // Unreachable, but we should be safe either way.
+    }
+
+    @Override
+    public Object visitCallExpr(Expr.Call expr){
+        Object callee = evaluate(expr.callee);
+
+        List<Object> arguments = new ArrayList<>();
+        for (Expr argument : expr.arguments) {
+            arguments.add(evaluate(argument));  // Note: These arguments are evaluated in order, which means that if side effects occur
+        }                                       // there could be weird consequences. This is mostly on the end user to handle.
+                                                // Some compilers reorder things for efficiency, but this can be tough to debug in the side-effect case.
+
+        if(!(callee instanceof LoxCallable)){
+            throw new RuntimeError(expr.paren, "Can only call functions and classes.");
+        }
+
+        LoxCallable function = (LoxCallable)callee;
+        // Note: this arity check could be done at a LoxCallable implementation level, but doing it here means more DRY
+        if(arguments.size() != function.arity()){
+            throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " +
+                                    arguments.size() + ".");
+        }
+
+        return function.call(this, arguments);
     }
 
     @Override

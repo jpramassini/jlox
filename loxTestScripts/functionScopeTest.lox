@@ -1,0 +1,8 @@
+// this should fail, due to reassignment.
+fun scope(a) {
+    var a = "local";
+    print a;
+}
+
+var test = "outer";
+scope(test);
