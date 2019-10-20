@@ -8,7 +8,7 @@ import java.util.List;
 
 public class GenerateAst {
     public static void main(String[] args) throws IOException {
-        if(args.length != 1){
+        if(args.length != 1) {
             System.err.println("Usage: generate_ast <output directory>");
             System.exit(1);
         }
@@ -61,7 +61,7 @@ public class GenerateAst {
         defineVisitor(writer, baseName, types);
 
             // define AST classes
-        for (String type : types){
+        for (String type : types) {
             String className = type.split(":")[0].trim();
             String fields = type.split(":")[1].trim();
             defineType(writer, baseName, className, fields);
@@ -116,7 +116,7 @@ public class GenerateAst {
 
         // Put those fields in the class
         writer.println();
-        for (String field : fields){
+        for (String field : fields) {
             writer.println("        final " + field + ";");
         }
 

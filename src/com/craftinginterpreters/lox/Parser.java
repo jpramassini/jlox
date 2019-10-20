@@ -48,7 +48,7 @@ public class Parser {
         }
     }
 
-    private Stmt classDeclaration(){
+    private Stmt classDeclaration() {
         Token name = consume(IDENTIFIER, "Expect class name."); // class keyword already consumed, so look for identifier next.
 
         Expr.Variable superclass = null;
@@ -146,7 +146,7 @@ public class Parser {
     private Stmt returnStatement() {
         Token keyword = previous(); // grab the return keyword
         Expr value = null;
-        if(!check(SEMICOLON)){      // If there's anything after return, we're returning an expression of some sort.
+        if(!check(SEMICOLON)) {      // If there's anything after return, we're returning an expression of some sort.
             value = expression();   // This proves its presence by disproving its absence.
         }
 
@@ -189,7 +189,7 @@ public class Parser {
         List<Token> parameters = new ArrayList<>();
         if(!check(RIGHT_PAREN)) {
             do {
-                if(parameters.size() >= 255){
+                if(parameters.size() >= 255) {
                     error(peek(), "Cannot have more than 255 parameters."); // Not thrown on purpose
                 }
 

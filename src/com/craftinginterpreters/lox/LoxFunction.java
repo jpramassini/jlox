@@ -13,7 +13,7 @@ class LoxFunction implements LoxCallable {
         this.isInitializer = isInitializer;
     }
 
-    LoxFunction bind(LoxInstance instance){
+    LoxFunction bind(LoxInstance instance) {
         Environment environment = new Environment(closure);
         environment.define("this", instance);           // Inject instance reference into scope of function.
         return new LoxFunction(declaration, environment, isInitializer);
@@ -31,13 +31,13 @@ class LoxFunction implements LoxCallable {
            Allocation at definition would cause data to be shared across calls, which is very bad.
         */
         Environment environment = new Environment(closure); // inject closure data for local function support
-        for(int i = 0; i < declaration.params.size(); i++){
+        for(int i = 0; i < declaration.params.size(); i++) {
             environment.define(declaration.params.get(i).lexeme, arguments.get(i)); // map param names to arguments passed in environment.
         }
 
         try {
             interpreter.executeBlock(declaration.body, environment);
-        } catch(Return returnValue){    // This allows us to unwind the stack and toss out the rest of the function.
+        } catch(Return returnValue) {    // This allows us to unwind the stack and toss out the rest of the function.
             if(isInitializer) return closure.getAt(0, "this");  // In case of empty return in constructor, force return "this".
             return returnValue.value;
         }

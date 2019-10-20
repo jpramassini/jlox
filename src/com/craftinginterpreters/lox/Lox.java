@@ -67,14 +67,14 @@ public class Lox {
     }
 
     static void error(Token token, String message) {
-        if(token.type == TokenType.EOF){
+        if(token.type == TokenType.EOF) {
             report(token.line, " at end", message);
         } else {
             report(token.line, " at '" + token.lexeme + "'", message);
         }
     }
 
-    static void runtimeError(RuntimeError error){
+    static void runtimeError(RuntimeError error) {
         // Note: This is one of those places where storing the line in each token makes reporting errors a breeze.
         System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
         hadRuntimeError = true;

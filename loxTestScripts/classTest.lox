@@ -1,10 +1,10 @@
 class test {
-    init(newValue){
+    init(newValue) {
         this.value = newValue;
         this.number = 0;
     }
 
-    incrementValue(){
+    incrementValue() {
         this.number = this.number + 1;
     }
 }

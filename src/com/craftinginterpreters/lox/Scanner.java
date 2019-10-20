@@ -50,13 +50,13 @@ class Scanner {
     private int current = 0; // Position of current lexeme being examined.
     private int line = 1;
 
-    Scanner(String source){
+    Scanner(String source) {
         this.source = source;
     }
 
-    List<Token> scanTokens(){
+    List<Token> scanTokens() {
         // Not at end of file, keep on scanning tokens.
-        while(!isAtEnd()){
+        while(!isAtEnd()) {
             start = current;
             scanToken();
         }
@@ -67,7 +67,7 @@ class Scanner {
         return tokens;
     }
 
-    private void scanToken(){
+    private void scanToken() {
         char c = advance();
         switch(c) {
             case '(': addToken(LEFT_PAREN); break;
@@ -101,7 +101,7 @@ class Scanner {
             case '"': string(); break; // A " signifies the beginning of a string.
 
             default:
-                if(isDigit(c)){ // Any numerical digit is valid here
+                if(isDigit(c)) { // Any numerical digit is valid here
                     number();
                 } else if(isAlpha(c)) {
                     identifier();
@@ -112,7 +112,7 @@ class Scanner {
         }
     }
 
-    private void identifier(){
+    private void identifier() {
         while(isAlphaNumeric(peek())) advance();
         // Check if identifier is a reserved word.
         String text = source.substring(start, current);
@@ -125,7 +125,7 @@ class Scanner {
         while(isDigit(peek())) advance();  // Keep on trucking while the next thing is also a digit.
 
         // Look for decimals...
-        if(peek() == '.' && isDigit(peekNext())){   // If another digit is not next, then stop.
+        if(peek() == '.' && isDigit(peekNext())) {   // If another digit is not next, then stop.
             // Consume '.'
             advance();
 
@@ -137,12 +137,12 @@ class Scanner {
     }
 
     private void string() {
-        while(peek() != '"' && !isAtEnd()){
+        while(peek() != '"' && !isAtEnd()) {
             if(peek() == '\n') line++;  // This line means multi-line strings ARE supported by Lox.
             advance();
         }
 
-        if(isAtEnd()){  // Uh oh, somebody forgot a closing quote.
+        if(isAtEnd()) {  // Uh oh, somebody forgot a closing quote.
             Lox.error(line, "Unterminated string.");
         }
 
@@ -163,44 +163,44 @@ class Scanner {
         return true;
     }
 
-    private char peek(){    // This is a lookahead, not how we never call advance() here.
+    private char peek() {    // This is a lookahead, not how we never call advance() here.
         if(isAtEnd()) return '\0';
         return source.charAt(current);
     }
 
-    private char peekNext(){
+    private char peekNext() {
         if(current + 1 >= source.length()) return '\0';
         return source.charAt(current + 1);
     }
 
-    private boolean isAlpha(char c){
+    private boolean isAlpha(char c) {
         return (c >= 'a' && c <= 'z') ||
                 (c >= 'A' && c <= 'Z') ||
                 c == '_';
     }
 
-    private boolean isAlphaNumeric(char c){
+    private boolean isAlphaNumeric(char c) {
         return isAlpha(c) || isDigit(c);
     }
 
-    private boolean isDigit(char c){
+    private boolean isDigit(char c) {
         return c >= '0' && c <= '9';
     }
 
-    private boolean isAtEnd(){
+    private boolean isAtEnd() {
         return current >= source.length();
     }
 
-    private char advance(){
+    private char advance() {
         current++;
         return source.charAt(current-1);
     }
 
-    private void addToken(TokenType type){
+    private void addToken(TokenType type) {
         addToken(type, null);
     }
 
-    private void addToken(TokenType type, Object literal){
+    private void addToken(TokenType type, Object literal) {
         String text = source.substring(start, current);
         tokens.add(new Token(type, text, literal, line));
     }

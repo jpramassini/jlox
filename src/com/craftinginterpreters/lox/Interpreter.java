@@ -18,7 +18,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     Interpreter() {
         // this is an example of exposing a native function. This could be extended to support anything Java does!
         // TODO: Build a module import system out of this.
-        globals.define("clock", new LoxCallable(){  // Note: This means that functions and variables are held together! This allows collisions,
+        globals.define("clock", new LoxCallable() {  // Note: This means that functions and variables are held together! This allows collisions,
             @Override                                             // but allows referring to functions as first-class values.
             public int arity() {
                 return 0;
@@ -34,16 +34,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         });
     }
 
-    public void setReplMode(boolean replMode){
+    public void setReplMode(boolean replMode) {
         this.replMode = replMode;
     }
 
-    void interpret(List<Stmt> statements){
+    void interpret(List<Stmt> statements) {
         try {
             for (Stmt statement : statements) {
                 execute(statement);
             }
-        } catch (RuntimeError error){
+        } catch (RuntimeError error) {
             Lox.runtimeError(error);
         }
     }
@@ -52,20 +52,20 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         return expr.accept(this);
     }
 
-    private void execute(Stmt stmt){    // Note: this is the statement equivalent to evaluate()
+    private void execute(Stmt stmt) {    // Note: this is the statement equivalent to evaluate()
         stmt.accept(this);
     }
 
-    public void resolve(Expr expr, int depth){
+    public void resolve(Expr expr, int depth) {
         locals.put(expr, depth);    // Put the expression in the locals table along with the depth.
     }
 
-    public void executeBlock(List<Stmt> statements, Environment environment){
+    public void executeBlock(List<Stmt> statements, Environment environment) {
         Environment previous = this.environment;    // Store higher environment to reset later
         try {
             this.environment = environment;         // Switch execution scope to new local scope. Because of the recursive nature of
                                                     // the Environment class, it's still accessible if necessary.
-            for(Stmt statement : statements){
+            for(Stmt statement : statements) {
                 execute(statement);
             }
         } finally {
@@ -74,15 +74,15 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Void visitBlockStmt(Stmt.Block stmt){
+    public Void visitBlockStmt(Stmt.Block stmt) {
         executeBlock(stmt.statements, new Environment(environment));    // Execute block, instantiating a new environment which is enclosed
         return null;                                                    // by the global scope on the way in.
     }
 
     @Override
-    public Void visitClassStmt(Stmt.Class stmt){
+    public Void visitClassStmt(Stmt.Class stmt) {
         Object superclass = null;
-        if(stmt.superclass != null){
+        if(stmt.superclass != null) {
             superclass = evaluate(stmt.superclass);
             if(!(superclass instanceof LoxClass)) {
                 throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
@@ -97,7 +97,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         }
         // Note: now that the current environment has a reference to the superclass, we can define methods (which may need to reference it)
         Map<String, LoxFunction> methods = new HashMap<>();
-        for(Stmt.Function method : stmt.methods){
+        for(Stmt.Function method : stmt.methods) {
             LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
             methods.put(method.name.lexeme, function);
         }
@@ -109,7 +109,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Void visitExpressionStmt(Stmt.Expression stmt){
+    public Void visitExpressionStmt(Stmt.Expression stmt) {
         Object result = evaluate(stmt.expression);
         if(this.replMode && !(stmt.expression instanceof Expr.Assign || stmt.expression instanceof Expr.Set || stmt.expression instanceof Expr.Call)) System.out.println(stringify(result));    // Immediately print result of expressions if running in repl.
         return null;    // Note: This return is necessary to satisfy the Java Void type requirements.
@@ -124,9 +124,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     @Override
     public Void visitIfStmt(Stmt.If stmt) {         // Note: the Lox implementation ends up being a small wrapper around the same Java code.
-        if(isTruthy(evaluate(stmt.condition))){
+        if(isTruthy(evaluate(stmt.condition))) {
             execute(stmt.thenBranch);
-        } else if(stmt.elseBranch != null){
+        } else if(stmt.elseBranch != null) {
             execute(stmt.elseBranch);
         }
         return null;
@@ -140,7 +140,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Void visitReturnStmt(Stmt.Return stmt){
+    public Void visitReturnStmt(Stmt.Return stmt) {
         Object value = null;
         if(stmt.value != null) value = evaluate(stmt.value);
 
@@ -148,9 +148,9 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Void visitVarStmt(Stmt.Var stmt){
+    public Void visitVarStmt(Stmt.Var stmt) {
         Object value = null;
-        if(stmt.initializer != null){
+        if(stmt.initializer != null) {
             value = evaluate(stmt.initializer);
         }
 
@@ -159,19 +159,19 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Void visitWhileStmt(Stmt.While stmt){
-        while(isTruthy(evaluate(stmt.condition))){
+    public Void visitWhileStmt(Stmt.While stmt) {
+        while(isTruthy(evaluate(stmt.condition))) {
             execute(stmt.body);
         }
         return null;
     }
 
     @Override
-    public Object visitAssignExpr(Expr.Assign expr){
+    public Object visitAssignExpr(Expr.Assign expr) {
         Object value = evaluate(expr.value);
 
         Integer distance = locals.get(expr);
-        if(distance != null){
+        if(distance != null) {
             environment.assignAt(distance, expr.name, value);
         } else {
             globals.assign(expr.name, value);
@@ -192,11 +192,11 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
                 return (double)left - (double)right;
             case PLUS:                              // The + operator is special because it's overloaded to allow both
                                                     // arithmetic adding and string concatenation.
-                if(left instanceof Double && right instanceof Double){
+                if(left instanceof Double && right instanceof Double) {
                     return (double)left + (double) right;
                 }
 
-                if((left instanceof String) && (right instanceof String || right instanceof Double || right instanceof Boolean)){
+                if((left instanceof String) && (right instanceof String || right instanceof Double || right instanceof Boolean)) {
                     return (String)left + stringify(right);
                 }
                 // Addition is once again a special case and requires its own specific error handling.
@@ -226,7 +226,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Object visitCallExpr(Expr.Call expr){
+    public Object visitCallExpr(Expr.Call expr) {
         Object callee = evaluate(expr.callee);
 
         List<Object> arguments = new ArrayList<>();
@@ -235,13 +235,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         }                                       // there could be weird consequences. This is mostly on the end user to handle.
                                                 // Some compilers reorder things for efficiency, but this can be tough to debug in the side-effect case.
 
-        if(!(callee instanceof LoxCallable)){
+        if(!(callee instanceof LoxCallable)) {
             throw new RuntimeError(expr.paren, "Can only call functions and classes.");
         }
 
         LoxCallable function = (LoxCallable)callee;
         // Note: this arity check could be done at a LoxCallable implementation level, but doing it here means more DRY
-        if(arguments.size() != function.arity()){
+        if(arguments.size() != function.arity()) {
             throw new RuntimeError(expr.paren, "Expected " + function.arity() + " arguments but got " +
                                     arguments.size() + ".");
         }
@@ -250,7 +250,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Object visitGetExpr(Expr.Get expr){
+    public Object visitGetExpr(Expr.Get expr) {
         Object object = evaluate(expr.object);
         if(object instanceof LoxInstance) {
             return ((LoxInstance) object).get(expr.name);
@@ -265,10 +265,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Object visitLogicalExpr(Expr.Logical expr){
+    public Object visitLogicalExpr(Expr.Logical expr) {
         Object left = evaluate(expr.left);
          // Here's where the earlier work establishing truthiness becomes helpful!
-        if(expr.operator.type == TokenType.OR){
+        if(expr.operator.type == TokenType.OR) {
             if(isTruthy(left)) return left;   // Note: evaluate left first to see if short-circuit is possible.
         } else {
             if(!isTruthy(left)) return left;
@@ -298,7 +298,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Object visitSetExpr(Expr.Set expr){
+    public Object visitSetExpr(Expr.Set expr) {
         Object object = evaluate(expr.object);      // first evaluate left side in case there's an expression tree to sort out.
 
         if(!(object instanceof LoxInstance)) {
@@ -311,7 +311,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
-    public Object visitSuperExpr(Expr.Super expr){
+    public Object visitSuperExpr(Expr.Super expr) {
         int distance = locals.get(expr);
         LoxClass superclass = (LoxClass)environment.getAt(distance, "super");   // Look up "super" in the proper environment.
 
@@ -319,43 +319,43 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         LoxInstance object = (LoxInstance)environment.getAt(distance - 1, "this");
 
         LoxFunction method = superclass.findMethod(expr.method.lexeme);
-        if(method == null){
+        if(method == null) {
             throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");
         }
         return method.bind(object);
     }
 
     @Override
-    public Object visitThisExpr(Expr.This expr){
+    public Object visitThisExpr(Expr.This expr) {
         return lookUpVariable(expr.keyword, expr);
     }
 
     @Override
-    public Object visitVariableExpr(Expr.Variable expr){
+    public Object visitVariableExpr(Expr.Variable expr) {
         // return environment.get(expr.name);    - No longer doing this as we now use static resolution.
         return lookUpVariable(expr.name, expr);
     }
 
-    private Object lookUpVariable(Token name, Expr expr){
+    private Object lookUpVariable(Token name, Expr expr) {
         Integer distance = locals.get(expr);
-        if(distance != null){
+        if(distance != null) {
             return environment.getAt(distance, name.lexeme);
         } else {
             return globals.get(name);   // No distance, so assumed to be global.
         }
     }
 
-    private void checkNumberOperand(Token operator, Object operand){
+    private void checkNumberOperand(Token operator, Object operand) {
         if(operand instanceof Double) return;
         throw new RuntimeError(operator, "Operand must be a number.");
     }
 
-    private void checkNumberOperands(Token operator, Object left, Object right){
+    private void checkNumberOperands(Token operator, Object left, Object right) {
         if(left instanceof Double && right instanceof Double) return;
         throw new RuntimeError(operator, "Operands must be numbers.");
     }
 
-    private boolean isEqual(Object a, Object b){
+    private boolean isEqual(Object a, Object b) {
         // nil is only equal to nil!
         if(a == null && b == null) return true;     // These two null cases are handled so as not to throw a NullPointerException
         if(a == null) return false;
@@ -367,19 +367,19 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         In this case, nil and false booleans are truthy and everything else is falsey. This could be made more robust
         to check for empty arrays, empty strings, 0, etc. (Different languages have different approaches.)
      */
-    private boolean isTruthy(Object object){
+    private boolean isTruthy(Object object) {
         if(object==null) return false;
         if(object instanceof Boolean) return (boolean)object;   // Could be condensed, keeping this for readability/modifiable-ness
         return true;
     }
 
-    private String stringify(Object object){
+    private String stringify(Object object) {
         if(object == null) return "nil";
 
         // This is a fun hack to remove the ".0" that comes with treating everything as a double.
-        if(object instanceof Double){
+        if(object instanceof Double) {
             String text = object.toString();
-            if(text.endsWith(".0")){
+            if(text.endsWith(".0")) {
                 text = text.substring(0, text.length() - 2);
             }
             return text;

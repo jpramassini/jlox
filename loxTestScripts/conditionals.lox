@@ -2,7 +2,7 @@ if(true) {
     print "It's true.";
 }
 
-if(false){
+if(false) {
     print "It's definitely true.";
 } else {
     print "Aw dang it's false.";
