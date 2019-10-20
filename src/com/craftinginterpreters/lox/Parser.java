@@ -50,6 +50,13 @@ public class Parser {
 
     private Stmt classDeclaration(){
         Token name = consume(IDENTIFIER, "Expect class name."); // class keyword already consumed, so look for identifier next.
+
+        Expr.Variable superclass = null;
+        if(match(LESS)) {
+            consume(IDENTIFIER, "Expect superclass name.");
+            superclass = new Expr.Variable(previous());
+        }
+
         consume(LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
@@ -58,7 +65,7 @@ public class Parser {
         }
 
         consume(RIGHT_BRACE, "Expect '}' after class body.");
-        return new Stmt.Class(name, methods);
+        return new Stmt.Class(name, superclass, methods);
     }
 
     private Stmt statement() {
@@ -227,7 +234,7 @@ public class Parser {
             if(expr instanceof Expr.Variable) {          // Note: We first check if the L value is a variable identifier before creating a
                 Token name = ((Expr.Variable) expr).name;//       Variable node,
                 return new Expr.Assign(name, value);
-            } else if(expr instanceof Expr.Get) {
+            } else if(expr instanceof Expr.Get) {   // Use the logic from earlier to reshape a get into a set. The fact that we found an '=' means it's a set.
                 Expr.Get get = (Expr.Get)expr;
                 return new Expr.Set(get.object, get.name, value);
             }
@@ -359,7 +366,7 @@ public class Parser {
                 expr = finishCall(expr);    // Parse call, using previous expr as the callee. This will also recursively build up chained call results.
             } else if(match(DOT)) {
                 Token name = consume(IDENTIFIER, "Expect property name after '.'");
-                expr = new Expr.Get(expr, name);
+                expr = new Expr.Get(expr, name);    // Catch this early, so we can rely on this node for Set expressions too.
             } else {
                 break;
             }
@@ -378,6 +385,13 @@ public class Parser {
         if(match(NUMBER, STRING)) {
             // These values have already been parsed into Java values by the scanner
             return new Expr.Literal(previous().literal);
+        }
+
+        if(match(SUPER)) {      // We hit super! Treat this much like "get".
+            Token keyword = previous();
+            consume(DOT, "Expect '.' after 'super'.");
+            Token method = consume(IDENTIFIER, "Expect superclass method name.");
+            return new Expr.Super(keyword, method);
         }
 
         if(match(THIS)) return new Expr.This(previous());

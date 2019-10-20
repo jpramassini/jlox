@@ -81,15 +81,29 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     @Override
     public Void visitClassStmt(Stmt.Class stmt){
+        Object superclass = null;
+        if(stmt.superclass != null){
+            superclass = evaluate(stmt.superclass);
+            if(!(superclass instanceof LoxClass)) {
+                throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
+            }
+        }
+
         environment.define(stmt.name.lexeme, null);
 
+        if(stmt.superclass != null) {   // We're evaluating a subclass, so create a new environment to store superclass ref.
+            environment = new Environment(environment);
+            environment.define("super", superclass);
+        }
+        // Note: now that the current environment has a reference to the superclass, we can define methods (which may need to reference it)
         Map<String, LoxFunction> methods = new HashMap<>();
         for(Stmt.Function method : stmt.methods){
             LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
             methods.put(method.name.lexeme, function);
         }
 
-        LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+        LoxClass klass = new LoxClass(stmt.name.lexeme, (LoxClass)superclass, methods);
+        if(superclass != null) environment = environment.enclosing; // Done with need to reference super, so pop the environment.
         environment.assign(stmt.name, klass);
         return null;
     }
@@ -285,7 +299,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     @Override
     public Object visitSetExpr(Expr.Set expr){
-        Object object = evaluate(expr.object);
+        Object object = evaluate(expr.object);      // first evaluate left side in case there's an expression tree to sort out.
 
         if(!(object instanceof LoxInstance)) {
             throw new RuntimeError(expr.name, "Only instances have fields.");
@@ -294,6 +308,21 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         Object value = evaluate(expr.value);
         ((LoxInstance)object).set(expr.name, value);
         return value;
+    }
+
+    @Override
+    public Object visitSuperExpr(Expr.Super expr){
+        int distance = locals.get(expr);
+        LoxClass superclass = (LoxClass)environment.getAt(distance, "super");   // Look up "super" in the proper environment.
+
+        // "this" is always one level closer than "super"'s environment
+        LoxInstance object = (LoxInstance)environment.getAt(distance - 1, "this");
+
+        LoxFunction method = superclass.findMethod(expr.method.lexeme);
+        if(method == null){
+            throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");
+        }
+        return method.bind(object);
     }
 
     @Override
