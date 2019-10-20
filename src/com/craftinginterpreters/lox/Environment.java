@@ -40,14 +40,8 @@ public class Environment {
     }
 
     // The string version of this call is used for adding new native functions.
-    void defineInternal(String name, Object value){
+    void define(String name, Object value){
         values.put(name, value);
-    }
-
-    // No longer allow redefinition to prevent argument reassignment.
-    void define(Token name, Object value) {
-        if(values.containsKey(name.lexeme)) throw new RuntimeError(name, "Variable '" + name.lexeme + "' already defined in this scope.");
-        values.put(name.lexeme, value);
     }
 
     Environment ancestor(int distance){

@@ -18,7 +18,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     Interpreter() {
         // this is an example of exposing a native function. This could be extended to support anything Java does!
         // TODO: Build a module import system out of this.
-        globals.defineInternal("clock", new LoxCallable(){  // Note: This means that functions and variables are held together! This allows collisions,
+        globals.define("clock", new LoxCallable(){  // Note: This means that functions and variables are held together! This allows collisions,
             @Override                                             // but allows referring to functions as first-class values.
             public int arity() {
                 return 0;
@@ -80,16 +80,31 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Void visitClassStmt(Stmt.Class stmt){
+        environment.define(stmt.name.lexeme, null);
+
+        Map<String, LoxFunction> methods = new HashMap<>();
+        for(Stmt.Function method : stmt.methods){
+            LoxFunction function = new LoxFunction(method, environment, method.name.lexeme.equals("init"));
+            methods.put(method.name.lexeme, function);
+        }
+
+        LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+        environment.assign(stmt.name, klass);
+        return null;
+    }
+
+    @Override
     public Void visitExpressionStmt(Stmt.Expression stmt){
         Object result = evaluate(stmt.expression);
-        if(this.replMode && !(stmt.expression instanceof Expr.Assign)) System.out.println(stringify(result));    // Immediately print result of expressions if running in repl.
+        if(this.replMode && !(stmt.expression instanceof Expr.Assign || stmt.expression instanceof Expr.Set || stmt.expression instanceof Expr.Call)) System.out.println(stringify(result));    // Immediately print result of expressions if running in repl.
         return null;    // Note: This return is necessary to satisfy the Java Void type requirements.
     }
 
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        LoxFunction function = new LoxFunction(stmt, environment);
-        environment.define(stmt.name, function); // Note: Make sure upper environment knows about function so it can actually be referenced.
+        LoxFunction function = new LoxFunction(stmt, environment, false);   // Normal function declaration, isInitializer always false.
+        environment.define(stmt.name.lexeme, function); // Note: Make sure upper environment knows about function so it can actually be referenced.
         return null;                                    // This also conveniently discards any functions that are declared within a local scope.
     }
 
@@ -125,7 +140,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
             value = evaluate(stmt.initializer);
         }
 
-        environment.define(stmt.name, value);    // There is an initializer, so pop it into the map.
+        environment.define(stmt.name.lexeme, value);    // There is an initializer, so pop it into the map.
         return null;
     }
 
@@ -221,6 +236,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     @Override
+    public Object visitGetExpr(Expr.Get expr){
+        Object object = evaluate(expr.object);
+        if(object instanceof LoxInstance) {
+            return ((LoxInstance) object).get(expr.name);
+        }
+
+        throw new RuntimeError(expr.name, "Only instances have properties.");
+    }
+
+    @Override
     public Object visitLiteralExpr(Expr.Literal expr) {
         return expr.value;
     }
@@ -258,6 +283,25 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
         return null;
     }
 
+    @Override
+    public Object visitSetExpr(Expr.Set expr){
+        Object object = evaluate(expr.object);
+
+        if(!(object instanceof LoxInstance)) {
+            throw new RuntimeError(expr.name, "Only instances have fields.");
+        }
+
+        Object value = evaluate(expr.value);
+        ((LoxInstance)object).set(expr.name, value);
+        return value;
+    }
+
+    @Override
+    public Object visitThisExpr(Expr.This expr){
+        return lookUpVariable(expr.keyword, expr);
+    }
+
+    @Override
     public Object visitVariableExpr(Expr.Variable expr){
         // return environment.get(expr.name);    - No longer doing this as we now use static resolution.
         return lookUpVariable(expr.name, expr);

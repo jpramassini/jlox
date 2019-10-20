@@ -1,0 +1,18 @@
+class test {
+    init(newValue){
+        this.value = newValue;
+        this.number = 0;
+    }
+
+    incrementValue(){
+        this.number = this.number + 1;
+    }
+}
+
+var newTest = test("It works!");
+print newTest.value;
+
+newTest.number = 2;
+print newTest.number;
+newTest.incrementValue();
+print newTest.number;

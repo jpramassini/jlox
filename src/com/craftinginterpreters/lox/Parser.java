@@ -1,5 +1,7 @@
 package com.craftinginterpreters.lox;
 
+import com.sun.xml.internal.bind.v2.model.core.ID;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +38,7 @@ public class Parser {
 
     private Stmt declaration() {
         try{
+            if(match(CLASS)) return classDeclaration();
             if(match(FUN)) return function("function"); // Functions are recognized by their leading keyword.
             if (match(VAR)) return varDeclaration();
             return statement();
@@ -43,6 +46,19 @@ public class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt classDeclaration(){
+        Token name = consume(IDENTIFIER, "Expect class name."); // class keyword already consumed, so look for identifier next.
+        consume(LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while(!check(RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function("method")); // Gather those functions up!
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after class body.");
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt statement() {
@@ -211,6 +227,9 @@ public class Parser {
             if(expr instanceof Expr.Variable) {          // Note: We first check if the L value is a variable identifier before creating a
                 Token name = ((Expr.Variable) expr).name;//       Variable node,
                 return new Expr.Assign(name, value);
+            } else if(expr instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get)expr;
+                return new Expr.Set(get.object, get.name, value);
             }
 
             error(equals, "Invalid assignment target.");    // Note: this gets reported but not thrown to avoid triggering panic mode.
@@ -338,6 +357,9 @@ public class Parser {
         while(true) {
             if(match(LEFT_PAREN)) {     // A function call is denoted by a '(', so look for those.
                 expr = finishCall(expr);    // Parse call, using previous expr as the callee. This will also recursively build up chained call results.
+            } else if(match(DOT)) {
+                Token name = consume(IDENTIFIER, "Expect property name after '.'");
+                expr = new Expr.Get(expr, name);
             } else {
                 break;
             }
@@ -357,6 +379,8 @@ public class Parser {
             // These values have already been parsed into Java values by the scanner
             return new Expr.Literal(previous().literal);
         }
+
+        if(match(THIS)) return new Expr.This(previous());
 
         if(match(IDENTIFIER)) {
             return new Expr.Variable(previous());   // This is what allows the use of variables
