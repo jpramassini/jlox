@@ -2,7 +2,6 @@ package com.craftinginterpreters.tool;
 // This is in the tool package as this is not a publicly used package, just for constructing the classes initially.
 // This could be more easily done in a scripting language.
 import java.io.IOException;
-import java.io.File;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.List;

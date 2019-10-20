@@ -1,16 +1,19 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 // Note: Statements produce no values, hence the Void type on the Visitor interface.
 class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     // Note: putting this instantiation at the Interpreter class level keeps global variables around as long as the
     //      interpreter is running.
-    final Environment globals = new Environment();  // This allows us to keep a global environment reference regardless of how
-    private Environment environment = globals;      // deeply nested our environments get. That means this "environment"
-    private boolean replMode = false;               // field is responsible for the CURRENT environment
+    final Environment globals = new Environment();              // This allows us to keep a global environment reference regardless of how
+    private Environment environment = globals;                  // deeply nested our environments get. That means this "environment"
+    private final Map<Expr, Integer> locals = new HashMap<>();   // field is responsible for the CURRENT environment
+    private boolean replMode = false;
 
     Interpreter() {
         // this is an example of exposing a native function. This could be extended to support anything Java does!
@@ -51,6 +54,10 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
 
     private void execute(Stmt stmt){    // Note: this is the statement equivalent to evaluate()
         stmt.accept(this);
+    }
+
+    public void resolve(Expr expr, int depth){
+        locals.put(expr, depth);    // Put the expression in the locals table along with the depth.
     }
 
     public void executeBlock(List<Stmt> statements, Environment environment){
@@ -134,7 +141,13 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     public Object visitAssignExpr(Expr.Assign expr){
         Object value = evaluate(expr.value);
 
-        environment.assign(expr.name, value);
+        Integer distance = locals.get(expr);
+        if(distance != null){
+            environment.assignAt(distance, expr.name, value);
+        } else {
+            globals.assign(expr.name, value);
+        }
+
         return value;                                   // This returns the value to support nesting assignment in other expressions, i.e. print.
     }
 
@@ -246,7 +259,17 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void>{
     }
 
     public Object visitVariableExpr(Expr.Variable expr){
-        return environment.get(expr.name);
+        // return environment.get(expr.name);    - No longer doing this as we now use static resolution.
+        return lookUpVariable(expr.name, expr);
+    }
+
+    private Object lookUpVariable(Token name, Expr expr){
+        Integer distance = locals.get(expr);
+        if(distance != null){
+            return environment.getAt(distance, name.lexeme);
+        } else {
+            return globals.get(name);   // No distance, so assumed to be global.
+        }
     }
 
     private void checkNumberOperand(Token operator, Object operand){
